@@ -1,0 +1,8 @@
+/target
+storage/*
+src/tests/storage/*
+!src/tests/storage/basic
+!src/tests/storage/basic_ec
+temp/*
+!*.gitkeep
+.env
