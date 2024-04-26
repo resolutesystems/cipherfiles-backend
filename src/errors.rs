@@ -26,6 +26,10 @@ pub enum AppError {
     CorruptedUpload,
     #[error("This file is encrypted! You need to provide decryption key.")]
     MissingKey,
+    #[error("You can only set either expiration hours or expiration downloads! You can't do both at once man ://")]
+    BothExpirations,
+    #[error("Oops.. Looks like this file expired! What a luck...")]
+    UploadExpired,
 
     #[error("Something went wrong on our side! Please try again later.")]
     Other(#[from] anyhow::Error),
@@ -36,6 +40,7 @@ pub enum AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let code = match self {
+            Self::UploadExpired => StatusCode::NOT_FOUND,
             Self::Other(_) | Self::Crypto(_) => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::BAD_REQUEST,
         };
@@ -48,9 +53,12 @@ impl IntoResponse for AppError {
             AppError::InvalidDecryptionKey => "invalid-decryption-key",
             AppError::CorruptedUpload => "corrupted-upload",
             AppError::MissingKey => "missing-key",
+            AppError::BothExpirations => "both-expirations",
+            AppError::UploadExpired => "upload-expired",
             AppError::Other(_) | AppError::Crypto(_) => "other",
         };
 
+        // TODO(hito): better error handling, something like color_eyre
         if code == StatusCode::INTERNAL_SERVER_ERROR {
             tracing::error!("{self:?}");
         }

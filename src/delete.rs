@@ -4,6 +4,7 @@ use axum::{
     Extension,
 };
 use serde::Deserialize;
+use sqlx::PgPool;
 use tokio::fs;
 
 use crate::{
@@ -12,7 +13,16 @@ use crate::{
     repository, AppContext, STORAGE_PATH,
 };
 
-pub async fn delete_upload(
+pub async fn delete_upload(db: &PgPool, upload_id: &str) -> AppResult<()> {
+    repository::delete_upload(db, &upload_id).await?;
+
+    let file_path = format!("{STORAGE_PATH}{upload_id}");
+    fs::remove_file(file_path).await?;
+
+    Ok(())
+}
+
+pub async fn delete_endpoint(
     ctx: Extension<AppContext>,
     Path(upload_id): Path<String>,
     Query(query): Query<DeleteQuery>,
@@ -28,11 +38,7 @@ pub async fn delete_upload(
         return Err(AppError::InvalidDeleteKey);
     }
 
-    // if so then delete
-    repository::delete_upload(&ctx.db, &upload_id).await?;
-
-    let file_path = format!("{STORAGE_PATH}{upload_id}");
-    fs::remove_file(file_path).await?;
+    delete_upload(&ctx.db, &upload_id).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

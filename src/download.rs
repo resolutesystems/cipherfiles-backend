@@ -8,6 +8,7 @@ use axum::{
     Extension,
 };
 use chacha20poly1305::{aead::stream::DecryptorBE32, XChaCha20Poly1305};
+use chrono::{Duration, Utc};
 use serde::Deserialize;
 use tokio::{
     fs::{self, File},
@@ -16,10 +17,7 @@ use tokio::{
 use tokio_util::io::ReaderStream;
 
 use crate::{
-    errors::{AppError, AppResult},
-    repository::{add_download, fetch_upload},
-    utilities::{read_chunk, temp_file, DEC_CHUNK_SIZE},
-    AppContext, STORAGE_PATH,
+    delete::delete_upload, errors::{AppError, AppResult}, repository::{add_download, fetch_upload}, utilities::{read_chunk, temp_file, DEC_CHUNK_SIZE}, AppContext, STORAGE_PATH
 };
 
 pub async fn download_endpoint(
@@ -31,9 +29,21 @@ pub async fn download_endpoint(
         .await?
         .ok_or(AppError::UploadNotFound)?;
 
+    // TODO(hito): actually nice and better way of handling expired uploads
+    // because right now they are only removed IF someone tries to download them
+    // thus files that never get requested will stay in database and storage forever
+    if let Some(expiry_hours) = upload.expiry_hours {
+        if Utc::now() >= upload.created_at + Duration::hours(expiry_hours as _) {
+            if let Err(why) = delete_upload(&ctx.db, &upload_id).await {
+                tracing::error!("Failed to remove expired upload with id {upload_id}: {why:?}");
+            }
+            return Err(AppError::UploadExpired);
+        }
+    }
+
     let mut file = File::open(format!("{STORAGE_PATH}{upload_id}")).await?;
 
-    if let Some(nonce) = upload.nonce {
+    let body = if let Some(nonce) = upload.nonce {
         let nonce_bytes = hex::decode(nonce)?;
         let key = query.key.ok_or(AppError::MissingKey)?;
         let key_hash = upload.key_hash.ok_or(AppError::CorruptedUpload)?;
@@ -62,10 +72,6 @@ pub async fn download_endpoint(
             }
         }
 
-        if let Err(why) = add_download(&ctx.db, &upload_id).await {
-            tracing::warn!("failed to update download count for `{upload_id}`: {why:?}");
-        }
-
         temp_file.seek(SeekFrom::Start(0)).await?;
         let stream = ReaderStream::new(temp_file);
         let body = Body::from_stream(stream);
@@ -74,28 +80,31 @@ pub async fn download_endpoint(
             tracing::warn!("failed to remove decryption temp file ({temp_path}): {why:?}");
         }
 
-        Ok((
-            [(
-                CONTENT_DISPOSITION,
-                format!(r#"attachment; filename="{}""#, upload.file_name),
-            )],
-            body,
-        ))
+        body
     } else {
-        if let Err(why) = add_download(&ctx.db, &upload_id).await {
-            tracing::warn!("failed to update download count for `{upload_id}`: {why:?}");
-        }
-
         let stream = ReaderStream::new(file);
-        let body = Body::from_stream(stream);
-        Ok((
-            [(
-                CONTENT_DISPOSITION,
-                format!(r#"attachment; filename="{}""#, upload.file_name),
-            )],
-            body,
-        ))
+        Body::from_stream(stream)
+    };
+
+    if let Err(why) = add_download(&ctx.db, &upload_id).await {
+        tracing::warn!("failed to increment download count for `{upload_id}`: {why:?}");
     }
+
+    if let Some(expiry_downloads) = upload.expiry_downloads {
+        if expiry_downloads <= upload.downloads + 1 {
+            if let Err(why) = delete_upload(&ctx.db, &upload_id).await {
+                tracing::error!("Failed to remove expired upload with id {upload_id}: {why:?}");
+            }
+        }
+    }
+
+    Ok((
+        [(
+            CONTENT_DISPOSITION,
+            format!(r#"attachment; filename="{}""#, upload.file_name),
+        )],
+        body,
+    ))
 }
 
 #[derive(Deserialize)]

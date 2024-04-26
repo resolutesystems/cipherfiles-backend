@@ -31,7 +31,7 @@ use tower_http::{
 };
 use upload::upload_endpoint;
 
-use crate::{delete::delete_upload, stats::service_stats};
+use crate::{delete::delete_endpoint, stats::service_stats};
 
 const DATABASE_URL: &str = dotenv!("DATABASE_URL");
 const WEBSITE_ADDRESS: &str = dotenv!("WEBSITE_ADDRESS");
@@ -57,7 +57,7 @@ fn router(db: PgPool) -> Router {
 
     let router = Router::new()
         .route("/upload", post(upload_endpoint))
-        .route("/delete/:upload_id", delete(delete_upload))
+        .route("/delete/:upload_id", delete(delete_endpoint))
         .route("/download/:upload_id", get(download_endpoint))
         .route("/info/:upload_id", get(info_endpoint))
         .route("/stats", get(service_stats))

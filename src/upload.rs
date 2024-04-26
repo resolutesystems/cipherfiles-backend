@@ -78,6 +78,8 @@ async fn handle_upload(
     field: Field<'_>,
     file_name: String,
     encrypt: bool,
+    expiry_hours: Option<u32>,
+    expiry_downloads: Option<u32>,
 ) -> AppResult<UploadResponse> {
     let body = field.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
     let mut body_reader = StreamReader::new(body);
@@ -116,8 +118,8 @@ async fn handle_upload(
             nonce: nonce_hex,
             file_name,
             bytes: total_bytes,
-            expiry_hours: None,
-            expiry_downloads: None,
+            expiry_hours,
+            expiry_downloads,
         },
     )
     .await?;
@@ -134,6 +136,12 @@ pub async fn upload_endpoint(
     query: Query<UploadQuery>,
     mut multipart: Multipart,
 ) -> AppResult<Json<UploadResponse>> {
+    if let Some(_) = query.expiry_downloads {
+        if let Some(_) = query.expiry_hours {
+            return Err(AppError::BothExpirations);
+        }
+    }
+
     while let Some(field) = multipart.next_field().await? {
         match field.name() {
             Some("file") => (),
@@ -149,7 +157,7 @@ pub async fn upload_endpoint(
             return Err(AppError::InvalidFileName)?;
         }
 
-        let res = handle_upload(&ctx.db, field, file_name, query.encrypt).await?;
+        let res = handle_upload(&ctx.db, field, file_name, query.encrypt, query.expiry_hours, query.expiry_downloads).await?;
         return Ok(Json(res));
     }
 
