@@ -6,3 +6,4 @@ src/tests/storage/*
 temp/*
 !*.gitkeep
 .env
+Config.toml

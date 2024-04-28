@@ -30,6 +30,10 @@ pub enum AppError {
     BothExpirations,
     #[error("Oops.. Looks like this file expired! What a luck...")]
     UploadExpired,
+    #[error("This media file is too big for preview!")]
+    MediaTooBig,
+    #[error("Previewing media files of encrypted files are not supported yet!")]
+    PreviewNotSupported,
 
     #[error("Something went wrong on our side! Please try again later.")]
     Other(#[from] anyhow::Error),
@@ -41,6 +45,7 @@ impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let code = match self {
             Self::UploadExpired => StatusCode::NOT_FOUND,
+            Self::PreviewNotSupported => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Self::Other(_) | Self::Crypto(_) => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::BAD_REQUEST,
         };
@@ -55,6 +60,8 @@ impl IntoResponse for AppError {
             AppError::MissingKey => "missing-key",
             AppError::BothExpirations => "both-expirations",
             AppError::UploadExpired => "upload-expired",
+            AppError::MediaTooBig => "media-too-big",
+            AppError::PreviewNotSupported => "preview-not-supported",
             AppError::Other(_) | AppError::Crypto(_) => "other",
         };
 

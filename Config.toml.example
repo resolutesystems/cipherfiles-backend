@@ -7,6 +7,7 @@ bind_address = "127.0.0.1:3000"
 cors_origin = "http://127.0.0.1:5173" # value for Access-Control-Allow-Origin
 storage_dir = "storage/" # all uploads will be stored here
 temp_dir = "temp/" # when downloading encrypted file it will be placed here
+max_preview_bytes = 104857600 # what is the max file size that can be previewed
 
 [instrumentation]
 directives = ["cipherfiles_backend=trace", "tower_http=trace", "axum::rejection=trace", "axum=trace"]

@@ -20,6 +20,7 @@ pub struct GeneralConfig {
     pub cors_origin: String,
     pub storage_dir: String,
     pub temp_dir: String,
+    pub max_preview_bytes: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
