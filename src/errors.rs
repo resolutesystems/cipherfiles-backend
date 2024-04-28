@@ -101,6 +101,12 @@ impl From<chacha20poly1305::Error> for AppError {
     }
 }
 
+impl From<toml::de::Error> for AppError {
+    fn from(value: toml::de::Error) -> Self {
+        Self::Other(value.into())
+    }
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ErrorResponse {

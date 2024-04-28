@@ -1,14 +1,11 @@
-mod delete;
-mod download;
 mod errors;
-mod info;
+mod routes;
 mod instrumentation;
 mod models;
 mod repository;
-mod stats;
 mod tests;
-mod upload;
 mod utilities;
+mod config;
 
 #[cfg(not(unix))]
 use std::future;
@@ -19,39 +16,33 @@ use axum::{
     routing::{delete, get, post},
     Extension, Router,
 };
+use config::Config;
 use dotenvy_macro::dotenv;
-use download::download_endpoint;
 use errors::AppResult;
-use info::info_endpoint;
+use routes::{delete::delete_endpoint, download::download_endpoint, info::info_endpoint, preview::preview_endpoint, stats::service_stats, upload::upload_endpoint};
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use tokio::{net::TcpListener, signal};
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     limit::RequestBodyLimitLayer,
 };
-use upload::upload_endpoint;
 
-use crate::{delete::delete_endpoint, stats::service_stats};
+use crate::config::load_config;
 
+const CONFIG_PATH: &str = "Config.toml";
 const DATABASE_URL: &str = dotenv!("DATABASE_URL");
-const WEBSITE_ADDRESS: &str = dotenv!("WEBSITE_ADDRESS");
-const ADDRESS: &str = dotenv!("ADDRESS");
 
-#[cfg(not(test))]
-const STORAGE_PATH: &str = dotenv!("STORAGE_PATH");
-#[cfg(test)]
-const STORAGE_PATH: &str = "./src/tests/storage/";
-
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct AppContext {
+    cfg: Config,
     db: PgPool,
 }
 
-fn router(db: PgPool) -> Router {
+fn router(cfg: Config, db: PgPool) -> Router {
     let cors_layer = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::DELETE])
         .allow_origin(AllowOrigin::exact(
-            HeaderValue::from_str(WEBSITE_ADDRESS).unwrap(),
+            HeaderValue::from_str(&cfg.general.cors_origin).unwrap(),
         ))
         .allow_credentials(true);
 
@@ -60,11 +51,12 @@ fn router(db: PgPool) -> Router {
         .route("/delete/:upload_id", delete(delete_endpoint))
         .route("/download/:upload_id", get(download_endpoint))
         .route("/info/:upload_id", get(info_endpoint))
+        .route("/preview/:upload_id", get(preview_endpoint))
         .route("/stats", get(service_stats))
         .layer((
             DefaultBodyLimit::disable(),
             RequestBodyLimitLayer::new(1024 * 1024 * 1024 + 1024),
-            Extension(AppContext { db }),
+            Extension(AppContext { cfg, db }),
             cors_layer,
         ));
 
@@ -73,17 +65,19 @@ fn router(db: PgPool) -> Router {
 
 #[tokio::main]
 async fn main() -> AppResult<()> {
-    instrumentation::setup()?;
+    let config = load_config(CONFIG_PATH).await?;
+
+    instrumentation::setup(&config.instrumentation.directives)?;
 
     let db = PgPoolOptions::new()
         .max_connections(50)
         .connect(DATABASE_URL)
         .await?;
 
-    let listener = TcpListener::bind(ADDRESS).await?;
-    tracing::info!("api is available on http://{ADDRESS}");
+    let listener = TcpListener::bind(&config.general.bind_address).await?;
+    tracing::info!("api is available on http://{}", config.general.bind_address);
 
-    axum::serve(listener, router(db))
+    axum::serve(listener, router(config, db))
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 

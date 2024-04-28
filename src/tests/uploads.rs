@@ -10,15 +10,22 @@ mod tests {
     use sqlx::PgPool;
     use tokio::fs::File;
 
-    use crate::{errors::AppResult, router, upload::UploadResponse, STORAGE_PATH};
+    use crate::{config::{load_config, Config}, errors::AppResult, router, routes::upload::UploadResponse, CONFIG_PATH};
 
     const BASIC_FILE: &[u8] = include_bytes!("./storage/basic");
 
     type TestResult = anyhow::Result<()>;
 
+    async fn test_config() -> anyhow::Result<Config> {
+        let mut config = load_config(CONFIG_PATH).await?;
+        config.general.storage_dir = String::from("src/tests/storage/");
+        Ok(config)
+    }
+
     #[sqlx::test]
     async fn upload(db: PgPool) -> TestResult {
-        let router = router(db);
+        let config = test_config().await?;
+        let router = router(config, db);
         let server = TestServer::new(router)?;
 
         let multipart_form = MultipartForm::new()
@@ -36,7 +43,8 @@ mod tests {
 
     #[sqlx::test]
     async fn upload_encrypted(db: PgPool) -> TestResult {
-        let router = router(db);
+        let config = test_config().await?;
+        let router = router(config, db);
         let server = TestServer::new(router)?;
 
         let multipart_form = MultipartForm::new()
@@ -64,7 +72,8 @@ mod tests {
         .execute(&db)
         .await?;
 
-        let router = router(db);
+        let config = test_config().await?;
+        let router = router(config, db);
         let server = TestServer::new(router)?;
 
         let response = server.get("/download/basic").await;
@@ -82,7 +91,8 @@ mod tests {
             .execute(&db)
             .await?;
 
-        let router = router(db);
+        let config = test_config().await?;
+        let router = router(config, db);
         let server = TestServer::new(router)?;
 
         let response = server
@@ -102,7 +112,8 @@ mod tests {
 
     #[sqlx::test]
     async fn download_encrypted_invalid_key(db: PgPool) -> AppResult<()> {
-        let router = router(db);
+        let config = test_config().await?;
+        let router = router(config, db);
         let server = TestServer::new(router)?;
 
         let response = server
@@ -120,10 +131,12 @@ mod tests {
             .execute(&db)
             .await?;
 
-        let router = router(db);
+        let config = test_config().await?;
+        let storage_dir = config.general.storage_dir.clone();
+        let router = router(config, db);
         let server = TestServer::new(router)?;
 
-        File::create(format!("{STORAGE_PATH}useless")).await?;
+        File::create(format!("{storage_dir}useless")).await?;
 
         let response = server
             .delete("/delete/useless")

@@ -10,18 +10,19 @@ use tokio::fs;
 use crate::{
     errors::{AppError, AppResult},
     models::Upload,
-    repository, AppContext, STORAGE_PATH,
+    repository, AppContext,
 };
 
-pub async fn delete_upload(db: &PgPool, upload_id: &str) -> AppResult<()> {
+pub async fn delete_upload(db: &PgPool, storage_dir: &str, upload_id: &str) -> AppResult<()> {
     repository::delete_upload(db, &upload_id).await?;
 
-    let file_path = format!("{STORAGE_PATH}{upload_id}");
+    let file_path = format!("{storage_dir}{upload_id}");
     fs::remove_file(file_path).await?;
 
     Ok(())
 }
 
+#[tracing::instrument]
 pub async fn delete_endpoint(
     ctx: Extension<AppContext>,
     Path(upload_id): Path<String>,
@@ -38,12 +39,12 @@ pub async fn delete_endpoint(
         return Err(AppError::InvalidDeleteKey);
     }
 
-    delete_upload(&ctx.db, &upload_id).await?;
+    delete_upload(&ctx.db, &ctx.cfg.general.storage_dir, &upload_id).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct DeleteQuery {
     key: String,
 }

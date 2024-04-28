@@ -17,9 +17,12 @@ use tokio::{
 use tokio_util::io::ReaderStream;
 
 use crate::{
-    delete::delete_upload, errors::{AppError, AppResult}, repository::{add_download, fetch_upload}, utilities::{read_chunk, temp_file, DEC_CHUNK_SIZE}, AppContext, STORAGE_PATH
+    errors::{AppError, AppResult}, repository::{add_download, fetch_upload}, utilities::{read_chunk, temp_file, DEC_CHUNK_SIZE}, AppContext
 };
 
+use super::delete::delete_upload;
+
+#[tracing::instrument]
 pub async fn download_endpoint(
     ctx: Extension<AppContext>,
     Path(upload_id): Path<String>,
@@ -34,14 +37,14 @@ pub async fn download_endpoint(
     // thus files that never get requested will stay in database and storage forever
     if let Some(expiry_hours) = upload.expiry_hours {
         if Utc::now() >= upload.created_at + Duration::hours(expiry_hours as _) {
-            if let Err(why) = delete_upload(&ctx.db, &upload_id).await {
+            if let Err(why) = delete_upload(&ctx.db, &ctx.cfg.general.storage_dir, &upload_id).await {
                 tracing::error!("Failed to remove expired upload with id {upload_id}: {why:?}");
             }
             return Err(AppError::UploadExpired);
         }
     }
 
-    let mut file = File::open(format!("{STORAGE_PATH}{upload_id}")).await?;
+    let mut file = File::open(format!("{}{upload_id}", ctx.cfg.general.storage_dir)).await?;
 
     let body = if let Some(nonce) = upload.nonce {
         let nonce_bytes = hex::decode(nonce)?;
@@ -54,11 +57,12 @@ pub async fn download_endpoint(
 
         let key_bytes = hex::decode(key)?;
 
-        let (mut temp_file, temp_path) = temp_file().await?;
+        let (mut temp_file, temp_path) = temp_file(&ctx.cfg.general.storage_dir).await?;
         let mut decryptor = DecryptorBE32::<XChaCha20Poly1305>::new(
             key_bytes.as_slice().into(),
             nonce_bytes.as_slice().into(),
         );
+
         loop {
             let chunk = read_chunk(&mut file, DEC_CHUNK_SIZE).await?;
 
@@ -92,7 +96,7 @@ pub async fn download_endpoint(
 
     if let Some(expiry_downloads) = upload.expiry_downloads {
         if expiry_downloads <= upload.downloads + 1 {
-            if let Err(why) = delete_upload(&ctx.db, &upload_id).await {
+            if let Err(why) = delete_upload(&ctx.db, &ctx.cfg.general.storage_dir, &upload_id).await {
                 tracing::error!("Failed to remove expired upload with id {upload_id}: {why:?}");
             }
         }
@@ -107,7 +111,7 @@ pub async fn download_endpoint(
     ))
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct DownloadQuery {
     key: Option<String>,
 }

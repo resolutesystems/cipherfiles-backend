@@ -19,10 +19,11 @@ use crate::{
     errors::{AppError, AppResult},
     repository::{insert_upload, update_stats, InsertUpload},
     utilities::{friendly_id, read_chunk, ENC_CHUNK_SIZE},
-    AppContext, STORAGE_PATH,
+    AppContext,
 };
 
 async fn save_encrypted_file<R>(
+    storage_dir: &str,
     file_name: &str,
     key: &[u8; 32],
     nonce: &[u8; 19],
@@ -31,7 +32,7 @@ async fn save_encrypted_file<R>(
 where
     R: AsyncRead + Unpin,
 {
-    let mut file = File::create(format!("{STORAGE_PATH}{file_name}")).await?;
+    let mut file = File::create(format!("{storage_dir}{file_name}")).await?;
     let mut encryptor =
         EncryptorBE32::<XChaCha20Poly1305>::new(key.as_ref().into(), nonce.as_ref().into());
     let mut total_bytes = 0;
@@ -53,11 +54,11 @@ where
     Ok(total_bytes)
 }
 
-async fn save_file<R>(file_name: &str, body: &mut R) -> AppResult<usize>
+async fn save_file<R>(storage_dir: &str, file_name: &str, body: &mut R) -> AppResult<usize>
 where
     R: AsyncRead + Unpin,
 {
-    let mut file = File::create(format!("{STORAGE_PATH}{file_name}")).await?;
+    let mut file = File::create(format!("{storage_dir}{file_name}")).await?;
     let mut total_bytes = 0;
 
     loop {
@@ -74,6 +75,7 @@ where
 }
 
 async fn handle_upload(
+    storage_dir: &str,
     db: &PgPool,
     field: Field<'_>,
     file_name: String,
@@ -99,9 +101,9 @@ async fn handle_upload(
         key_hex = Some(hex::encode(key));
         nonce_hex = Some(hex::encode(nonce));
 
-        save_encrypted_file(&id, &key, &nonce, &mut body_reader).await?
+        save_encrypted_file(storage_dir, &id, &key, &nonce, &mut body_reader).await?
     } else {
-        save_file(&id, &mut body_reader).await?
+        save_file(storage_dir, &id, &mut body_reader).await?
     };
 
     if let Err(why) = update_stats(db, total_bytes as u64).await {
@@ -131,6 +133,7 @@ async fn handle_upload(
     })
 }
 
+#[tracing::instrument]
 pub async fn upload_endpoint(
     ctx: Extension<AppContext>,
     query: Query<UploadQuery>,
@@ -157,14 +160,14 @@ pub async fn upload_endpoint(
             return Err(AppError::InvalidFileName)?;
         }
 
-        let res = handle_upload(&ctx.db, field, file_name, query.encrypt, query.expiry_hours, query.expiry_downloads).await?;
+        let res = handle_upload(&ctx.cfg.general.storage_dir, &ctx.db, field, file_name, query.encrypt, query.expiry_hours, query.expiry_downloads).await?;
         return Ok(Json(res));
     }
 
     Err(AppError::EmptyUpload)
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct UploadQuery {
     #[serde(default)]
     pub encrypt: bool,

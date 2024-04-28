@@ -1,11 +1,9 @@
-use dotenvy_macro::dotenv;
 use nanoid::nanoid;
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncRead, AsyncReadExt},
 };
 
-const TEMP_PATH: &str = dotenv!("TEMP_PATH");
 const NANOID_ALPHABET: &[char] = &[
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'a', 'A', 'b', 'B', 'c', 'C', 'd', 'D', 'e',
     'E', 'f', 'F', 'g', 'G', 'h', 'H', 'i', 'I', 'j', 'J', 'k', 'K', 'l', 'L', 'm', 'M', 'n', 'N',
@@ -27,17 +25,18 @@ where
     Ok(chunk)
 }
 
-pub async fn temp_file() -> io::Result<(File, String)> {
-    let temp_id = nanoid!();
-    let temp_path = format!("{TEMP_PATH}{temp_id}");
-    let temp_file = OpenOptions::new()
+// TODO(hito): use tempfile crate
+pub async fn temp_file(temp_path: &str) -> io::Result<(File, String)> {
+    let file_path = format!("{temp_path}{}", nanoid!());
+    let file = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(true)
-        .open(&temp_path)
+        .open(&file_path)
         .await?;
-    Ok((temp_file, temp_path))
+
+    Ok((file, file_path))
 }
 
 pub fn friendly_id(len: usize) -> String {

@@ -1,0 +1,12 @@
+[database]
+# you can configure connection address in .env file
+max_connections = 5 # max number of connections that can be established by the pool
+
+[general]
+bind_address = "127.0.0.1:3000"
+cors_origin = "http://127.0.0.1:5173" # value for Access-Control-Allow-Origin
+storage_dir = "storage/" # all uploads will be stored here
+temp_dir = "temp/" # when downloading encrypted file it will be placed here
+
+[instrumentation]
+directives = ["cipherfiles_backend=trace", "tower_http=trace", "axum::rejection=trace", "axum=trace"]

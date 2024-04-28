@@ -4,7 +4,6 @@ use axum::{
     http::{Request, Response},
     Router,
 };
-use dotenvy_macro::dotenv;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 use tracing_error::ErrorLayer;
@@ -12,10 +11,8 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 
 use crate::utilities::friendly_id;
 
-const LOG_DIRECTIVES: &str = dotenv!("LOG_DIRECTIVES");
-
-pub fn setup() -> anyhow::Result<()> {
-    let filter = filter_layer()?;
+pub fn setup(directives: &[String]) -> anyhow::Result<()> {
+    let filter = filter_layer(directives)?;
 
     tracing_subscriber::registry()
         .with(filter)
@@ -37,14 +34,9 @@ pub fn setup() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn filter_layer() -> anyhow::Result<EnvFilter> {
-    let mut layer = EnvFilter::try_new(format!(
-        "{}={}",
-        env!("CARGO_PKG_NAME").replace('-', "_"),
-        tracing::Level::TRACE,
-    ))?;
+fn filter_layer(directives: &[String]) -> anyhow::Result<EnvFilter> {
+    let mut layer = EnvFilter::default();
 
-    let directives = LOG_DIRECTIVES.split(',');
     for directive in directives {
         layer = layer.add_directive(directive.parse()?);
     }
