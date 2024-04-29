@@ -32,8 +32,10 @@ pub enum AppError {
     UploadExpired,
     #[error("This media file is too big for preview!")]
     MediaTooBig,
-    #[error("Previewing media files of encrypted files are not supported yet!")]
+    #[error("Preview of this file is not supported yet!")]
     PreviewNotSupported,
+    #[error("Failed to validate your request, {0}")]
+    Validation(String),
 
     #[error("Something went wrong on our side! Please try again later.")]
     Other(#[from] anyhow::Error),
@@ -62,6 +64,7 @@ impl IntoResponse for AppError {
             AppError::UploadExpired => "upload-expired",
             AppError::MediaTooBig => "media-too-big",
             AppError::PreviewNotSupported => "preview-not-supported",
+            AppError::Validation(_) => "validation",
             AppError::Other(_) | AppError::Crypto(_) => "other",
         };
 

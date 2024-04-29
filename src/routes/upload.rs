@@ -1,5 +1,5 @@
 use axum::{
-    extract::{multipart::Field, Multipart, Query},
+    extract::{multipart::Field, Multipart},
     Extension, Json,
 };
 use chacha20poly1305::{
@@ -16,10 +16,7 @@ use tokio::{
 use tokio_util::io::StreamReader;
 
 use crate::{
-    errors::{AppError, AppResult},
-    repository::{insert_upload, update_stats, InsertUpload},
-    utilities::{friendly_id, read_chunk, ENC_CHUNK_SIZE},
-    AppContext,
+    errors::{AppError, AppResult}, extractors, repository::{insert_upload, update_stats, InsertUpload}, utilities::{friendly_id, read_chunk, ENC_CHUNK_SIZE}, AppContext
 };
 
 async fn save_encrypted_file<R>(
@@ -136,7 +133,7 @@ async fn handle_upload(
 #[tracing::instrument]
 pub async fn upload_endpoint(
     ctx: Extension<AppContext>,
-    query: Query<UploadQuery>,
+    extractors::Query(query): extractors::Query<UploadQuery>,
     mut multipart: Multipart,
 ) -> AppResult<Json<UploadResponse>> {
     if let Some(_) = query.expiry_downloads {

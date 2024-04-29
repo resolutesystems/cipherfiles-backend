@@ -337,6 +337,7 @@ dependencies = [
  "futures",
  "hex",
  "nanoid",
+ "num-ordinal",
  "serde",
  "sha256",
  "sqlx",
@@ -1151,6 +1152,12 @@ dependencies = [
  "num-integer",
  "num-traits",
 ]
+
+[[package]]
+name = "num-ordinal"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b244f65fa4ff30000abd52b6f916061f852b907cc17de811639c1aa2418eab6"
 
 [[package]]
 name = "num-traits"

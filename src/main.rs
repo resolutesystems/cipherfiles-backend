@@ -6,6 +6,7 @@ mod repository;
 mod tests;
 mod utilities;
 mod config;
+mod extractors;
 
 #[cfg(not(unix))]
 use std::future;

@@ -2,7 +2,6 @@ use std::io::SeekFrom;
 
 use axum::{
     body::Body,
-    extract::{Path, Query},
     http::header::CONTENT_DISPOSITION,
     response::IntoResponse,
     Extension,
@@ -17,7 +16,7 @@ use tokio::{
 use tokio_util::io::ReaderStream;
 
 use crate::{
-    errors::{AppError, AppResult}, repository::{add_download, fetch_upload}, utilities::{read_chunk, temp_file, DEC_CHUNK_SIZE}, AppContext
+    errors::{AppError, AppResult}, extractors, repository::{add_download, fetch_upload}, utilities::{read_chunk, temp_file, DEC_CHUNK_SIZE}, AppContext
 };
 
 use super::delete::delete_upload;
@@ -25,8 +24,8 @@ use super::delete::delete_upload;
 #[tracing::instrument]
 pub async fn download_endpoint(
     ctx: Extension<AppContext>,
-    Path(upload_id): Path<String>,
-    Query(query): Query<DownloadQuery>,
+    extractors::Path(upload_id): extractors::Path<String>,
+    extractors::Query(query): extractors::Query<DownloadQuery>,
 ) -> AppResult<impl IntoResponse> {
     let upload = fetch_upload(&ctx.db, &upload_id)
         .await?

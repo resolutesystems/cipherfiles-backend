@@ -1,19 +1,16 @@
 use axum::{
-    extract::{Path, Query},
     Extension, Json,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    errors::{AppError, AppResult},
-    repository::fetch_upload,
-    AppContext,
+    errors::{AppError, AppResult}, extractors, repository::fetch_upload, AppContext
 };
 
 pub async fn info_endpoint(
     ctx: Extension<AppContext>,
-    Path(upload_id): Path<String>,
-    Query(query): Query<InfoQuery>,
+    extractors::Path(upload_id): extractors::Path<String>,
+    extractors::Query(query): extractors::Query<InfoQuery>,
 ) -> AppResult<Json<InfoResponse>> {
     let upload = fetch_upload(&ctx.db, &upload_id)
         .await?

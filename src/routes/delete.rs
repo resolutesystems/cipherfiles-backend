@@ -1,5 +1,4 @@
 use axum::{
-    extract::{Path, Query},
     http::StatusCode,
     Extension,
 };
@@ -8,9 +7,7 @@ use sqlx::PgPool;
 use tokio::fs;
 
 use crate::{
-    errors::{AppError, AppResult},
-    models::Upload,
-    repository, AppContext,
+    errors::{AppError, AppResult}, extractors, models::Upload, repository, AppContext
 };
 
 pub async fn delete_upload(db: &PgPool, storage_dir: &str, upload_id: &str) -> AppResult<()> {
@@ -25,8 +22,8 @@ pub async fn delete_upload(db: &PgPool, storage_dir: &str, upload_id: &str) -> A
 #[tracing::instrument]
 pub async fn delete_endpoint(
     ctx: Extension<AppContext>,
-    Path(upload_id): Path<String>,
-    Query(query): Query<DeleteQuery>,
+    extractors::Path(upload_id): extractors::Path<String>,
+    extractors::Query(query): extractors::Query<DeleteQuery>,
 ) -> AppResult<StatusCode> {
     // check if upload exists
     let upload = sqlx::query_as!(Upload, "SELECT * FROM uploads WHERE id = $1", upload_id)
