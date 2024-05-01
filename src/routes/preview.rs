@@ -1,4 +1,5 @@
-use axum::{body::Body, http::header::CONTENT_DISPOSITION, response::IntoResponse, Extension};
+use axum::{body::Body, http::header::{CONTENT_DISPOSITION, CONTENT_TYPE}, response::IntoResponse, Extension};
+use infer::MatcherType;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 
@@ -16,28 +17,27 @@ pub async fn preview_endpoint(
         return Err(AppError::PreviewNotSupported);
     }
 
-    let parts = upload.file_name.split('.');
-    if let Some(part) = parts.last() {
-        if part != "mp4" && part != "mkv" && part != "jpeg" && part != "jpg" && part != "png" {
-            return Err(AppError::PreviewNotSupported);
-        }
+    let file_path = format!("{}{upload_id}", ctx.cfg.general.storage_dir);
+    let kind = infer::get_from_path(&file_path)?.ok_or(AppError::PreviewNotSupported)?;
+
+    if kind.matcher_type() != MatcherType::Image && kind.matcher_type() != MatcherType::Video {
+        return Err(AppError::PreviewNotSupported);
     }
 
     if upload.bytes > ctx.cfg.general.max_preview_bytes as i64 {
         return Err(AppError::MediaTooBig);
     }
 
-    let file_path = format!("{}{upload_id}", ctx.cfg.general.storage_dir);
     let file = File::open(file_path).await?;
 
     let stream = ReaderStream::new(file);
     let body = Body::from_stream(stream);
 
     Ok((
-        [(
-            CONTENT_DISPOSITION,
-            format!(r#"attachment; filename="{}""#, upload.file_name),
-        )],
+        [
+            (CONTENT_TYPE, kind.mime_type().to_string()),
+            (CONTENT_DISPOSITION, format!(r#"attachment; filename="{}""#, upload.file_name)),
+        ],
         body,
     ))
 }
