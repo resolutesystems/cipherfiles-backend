@@ -18,7 +18,12 @@ pub async fn preview_endpoint(
     }
 
     let file_path = format!("{}{upload_id}", ctx.cfg.general.storage_dir);
-    let kind = infer::get_from_path(&file_path)?.ok_or(AppError::PreviewNotSupported)?;
+    let kind = infer::get_from_path(&file_path)
+        .map_err(|why| {
+            tracing::error!("Failed to infer file type from {file_path}: {why:?}");
+            AppError::PreviewNotSupported
+        })?
+        .ok_or(AppError::PreviewNotSupported)?;
 
     if kind.matcher_type() != MatcherType::Image && kind.matcher_type() != MatcherType::Video {
         return Err(AppError::PreviewNotSupported);
