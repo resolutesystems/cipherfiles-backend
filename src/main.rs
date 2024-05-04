@@ -13,7 +13,7 @@ use std::future;
 
 use axum::{
     extract::DefaultBodyLimit,
-    http::{HeaderValue, Method},
+    http::{HeaderValue, Method, StatusCode},
     routing::{delete, get, post},
     Extension, Router,
 };
@@ -48,6 +48,7 @@ fn router(cfg: Config, db: PgPool) -> Router {
         .allow_credentials(true);
 
     let router = Router::new()
+        .route("/health", get(health_check))
         .route("/upload", post(upload_endpoint))
         .route("/delete/:upload_id", delete(delete_endpoint))
         .route("/download/:upload_id", get(download_endpoint))
@@ -107,4 +108,8 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
+}
+
+async fn health_check() -> StatusCode {
+    StatusCode::IM_A_TEAPOT
 }
