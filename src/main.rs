@@ -12,10 +12,7 @@ mod extractors;
 use std::future;
 
 use axum::{
-    extract::DefaultBodyLimit,
-    http::{HeaderValue, Method, StatusCode},
-    routing::{delete, get, post},
-    Extension, Router,
+    extract::DefaultBodyLimit, http::{HeaderValue, Method}, routing::{delete, get, post}, Extension, Json, Router
 };
 use config::Config;
 use dotenvy_macro::dotenv;
@@ -110,6 +107,6 @@ async fn shutdown_signal() {
     }
 }
 
-async fn health_check() -> StatusCode {
-    StatusCode::IM_A_TEAPOT
+async fn health_check() -> Json<String> {
+    Json(String::from("im alive!"))
 }
