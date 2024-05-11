@@ -1,4 +1,4 @@
-use axum::{body::Body, http::header::{CONTENT_DISPOSITION, CONTENT_TYPE}, response::IntoResponse, Extension};
+use axum::{body::Body, http::{header::{CONTENT_DISPOSITION, CONTENT_TYPE}, HeaderName, HeaderValue}, response::IntoResponse, Extension};
 use infer::MatcherType;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
@@ -40,8 +40,9 @@ pub async fn preview_endpoint(
 
     Ok((
         [
-            (CONTENT_TYPE, kind.mime_type().to_string()),
-            (CONTENT_DISPOSITION, format!(r#"attachment; filename="{}""#, upload.file_name)),
+            (HeaderName::from_static("embedded"), HeaderValue::from(1)),
+            (CONTENT_TYPE, HeaderValue::from_str(kind.mime_type()).unwrap()),
+            (CONTENT_DISPOSITION, HeaderValue::from_str(&format!(r#"attachment; filename="{}""#, upload.file_name)).unwrap()),
         ],
         body,
     ))
