@@ -13,9 +13,9 @@ pub async fn insert_upload(db: &PgPool, insert: InsertUpload) -> sqlx::Result<()
     sqlx::query!(
         r#"
         INSERT INTO uploads
-            (id, key_hash, delete_key, nonce, file_name, bytes, expiry_hours, expiry_downloads)
+            (id, key_hash, delete_key, nonce, file_name, bytes, expiry_hours, expiry_downloads, embedded)
         VALUES
-            ($1, $2, $3, $4, $5, $6, $7, $8)
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         "#,
         insert.id,
         insert.key_hash,
@@ -25,6 +25,7 @@ pub async fn insert_upload(db: &PgPool, insert: InsertUpload) -> sqlx::Result<()
         insert.bytes as i64,
         insert.expiry_hours.map(|n| n as i32),
         insert.expiry_downloads.map(|n| n as i32),
+        insert.embedded,
     )
     .execute(db)
     .await?;
@@ -64,4 +65,5 @@ pub struct InsertUpload {
     pub bytes: usize,
     pub expiry_hours: Option<u32>,
     pub expiry_downloads: Option<u32>,
+    pub embedded: bool,
 }

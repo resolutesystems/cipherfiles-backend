@@ -79,6 +79,7 @@ async fn handle_upload(
     encrypt: bool,
     expiry_hours: Option<u32>,
     expiry_downloads: Option<u32>,
+    embedded: bool,
 ) -> AppResult<UploadResponse> {
     let body = field.map_err(|err| io::Error::new(io::ErrorKind::Other, err));
     let mut body_reader = StreamReader::new(body);
@@ -119,6 +120,7 @@ async fn handle_upload(
             bytes: total_bytes,
             expiry_hours,
             expiry_downloads,
+            embedded,
         },
     )
     .await?;
@@ -157,7 +159,7 @@ pub async fn upload_endpoint(
             return Err(AppError::InvalidFileName)?;
         }
 
-        let res = handle_upload(&ctx.cfg.general.storage_dir, &ctx.db, field, file_name, query.encrypt, query.expiry_hours, query.expiry_downloads).await?;
+        let res = handle_upload(&ctx.cfg.general.storage_dir, &ctx.db, field, file_name, query.encrypt, query.expiry_hours, query.expiry_downloads, query.embedded).await?;
         return Ok(Json(res));
     }
 
@@ -168,6 +170,8 @@ pub async fn upload_endpoint(
 pub struct UploadQuery {
     #[serde(default)]
     pub encrypt: bool,
+    #[serde(default)]
+    pub embedded: bool,
     pub expiry_hours: Option<u32>,
     pub expiry_downloads: Option<u32>,
 }

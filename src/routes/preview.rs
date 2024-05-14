@@ -40,7 +40,7 @@ pub async fn preview_endpoint(
 
     Ok((
         [
-            (HeaderName::from_static("embedded"), HeaderValue::from(1)),
+            (HeaderName::from_static("embedded"), HeaderValue::from(upload.embedded as i32)),
             (CONTENT_TYPE, HeaderValue::from_str(kind.mime_type()).unwrap()),
             (CONTENT_DISPOSITION, HeaderValue::from_str(&format!(r#"attachment; filename="{}""#, upload.file_name)).unwrap()),
         ],

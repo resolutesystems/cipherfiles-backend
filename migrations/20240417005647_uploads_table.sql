@@ -8,5 +8,6 @@ CREATE TABLE uploads (
     downloads INT NOT NULL DEFAULT 0,
     expiry_hours INT,
     expiry_downloads INT,
+    embedded BOOL NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 )

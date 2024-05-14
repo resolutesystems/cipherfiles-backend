@@ -12,5 +12,6 @@ pub struct Upload {
     pub downloads: i32,
     pub expiry_hours: Option<i32>,
     pub expiry_downloads: Option<i32>,
+    pub embedded: bool,
     pub created_at: DateTime<Utc>,
 }
