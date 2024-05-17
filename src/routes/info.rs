@@ -19,7 +19,7 @@ pub async fn info_endpoint(
         .await?
         .ok_or(AppError::UploadNotFound)?;
 
-    // TODO(hito): actually nice and better way of handling expired uploads
+    // TODO(hito): better way of handling expired uploads
     // because right now they are only removed IF someone tries to download them
     // thus files that never get requested will stay in database and storage forever
     if let Some(expiry_hours) = upload.expiry_hours {
@@ -43,6 +43,7 @@ pub async fn info_endpoint(
         file_name: upload.file_name,
         bytes: upload.bytes,
         downloads: upload.downloads,
+        embedded: upload.embedded,
     }))
 }
 
@@ -57,4 +58,5 @@ pub struct InfoResponse {
     file_name: String,
     bytes: i64,
     downloads: i32,
+    embedded: bool,
 }
