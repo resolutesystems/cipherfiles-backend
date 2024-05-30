@@ -1,3 +1,8 @@
+# table of sha256 file hashes blacklist
+blacklist = [
+    "F62087F51DC13E4B1247807862B3CE3544B78B93B0DDC1FDA1EF5B91D0E3FD33",
+]
+
 [database]
 # you can configure connection address in .env file
 max_connections = 5 # max number of connections that can be established by the pool

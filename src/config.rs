@@ -30,6 +30,7 @@ pub struct InstrumentationConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
+    pub blacklist: Vec<String>,
     pub database: DatabaseConfig,
     pub general: GeneralConfig,
     pub instrumentation: InstrumentationConfig,

@@ -34,6 +34,8 @@ pub enum AppError {
     MediaTooBig,
     #[error("Preview of this file is not supported yet!")]
     PreviewNotSupported,
+    #[error("Failed to upload, file is blacklisted.")]
+    FileBlacklisted,
     #[error("Failed to validate your request, {0}")]
     Validation(String),
 
@@ -64,6 +66,7 @@ impl IntoResponse for AppError {
             AppError::UploadExpired => "upload-expired",
             AppError::MediaTooBig => "media-too-big",
             AppError::PreviewNotSupported => "preview-not-supported",
+            AppError::FileBlacklisted => "file-blacklist",
             AppError::Validation(_) => "validation",
             AppError::Other(_) | AppError::Crypto(_) => "other",
         };

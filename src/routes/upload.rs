@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tokio::{
     fs::File,
-    io::{self, AsyncRead, AsyncWriteExt},
+    io::{self, AsyncRead, AsyncWrite, AsyncWriteExt},
 };
 use tokio_util::io::StreamReader;
 
@@ -19,17 +19,16 @@ use crate::{
     errors::{AppError, AppResult}, extractors, repository::{insert_upload, update_stats, InsertUpload}, utilities::{friendly_id, read_chunk, ENC_CHUNK_SIZE}, AppContext
 };
 
-async fn save_encrypted_file<R>(
-    storage_dir: &str,
-    file_name: &str,
+async fn save_encrypted_file<W, R>(
+    file: &mut W,
     key: &[u8; 32],
     nonce: &[u8; 19],
     body: &mut R,
 ) -> AppResult<usize>
 where
+    W: AsyncWrite + Unpin,
     R: AsyncRead + Unpin,
 {
-    let mut file = File::create(format!("{storage_dir}{file_name}")).await?;
     let mut encryptor =
         EncryptorBE32::<XChaCha20Poly1305>::new(key.as_ref().into(), nonce.as_ref().into());
     let mut total_bytes = 0;
@@ -51,11 +50,11 @@ where
     Ok(total_bytes)
 }
 
-async fn save_file<R>(storage_dir: &str, file_name: &str, body: &mut R) -> AppResult<usize>
+async fn save_file<W, R>(file: &mut W, body: &mut R) -> AppResult<usize>
 where
+    W: AsyncWrite + Unpin,
     R: AsyncRead + Unpin,
 {
-    let mut file = File::create(format!("{storage_dir}{file_name}")).await?;
     let mut total_bytes = 0;
 
     loop {
@@ -73,6 +72,7 @@ where
 
 async fn handle_upload(
     storage_dir: &str,
+    blacklist: &[String],
     db: &PgPool,
     field: Field<'_>,
     file_name: String,
@@ -89,6 +89,15 @@ async fn handle_upload(
     let mut key_hex = None;
     let mut nonce_hex = None;
 
+    let file_path = format!("{storage_dir}{id}");
+    let mut file = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&file_path)
+        .await?;
+
     let total_bytes = if encrypt {
         let mut key = [0u8; 32];
         OsRng.fill_bytes(&mut key);
@@ -99,10 +108,21 @@ async fn handle_upload(
         key_hex = Some(hex::encode(key));
         nonce_hex = Some(hex::encode(nonce));
 
-        save_encrypted_file(storage_dir, &id, &key, &nonce, &mut body_reader).await?
+        save_encrypted_file(&mut file, &key, &nonce, &mut body_reader).await?
     } else {
-        save_file(storage_dir, &id, &mut body_reader).await?
+        save_file(&mut file, &mut body_reader).await?
     };
+
+    // blacklist check
+    match sha256::try_async_digest(file_path).await {
+        Ok(hash) => {
+            let lc_blacklist = blacklist.iter().map(|bl| bl.to_lowercase()).collect::<Vec<_>>(); // TODO(hito): save it somewhere so it doesnt have to be computed every upload
+            if lc_blacklist.contains(&hash.to_lowercase()) {
+                return Err(AppError::FileBlacklisted);
+            }
+        }
+        Err(why) => tracing::error!("Failed to check file hash!! File name: {id}, Error: {why:?}")
+    }
 
     if let Err(why) = update_stats(db, total_bytes as u64).await {
         tracing::error!("failed to update stats: {why:?}");
@@ -159,7 +179,7 @@ pub async fn upload_endpoint(
             return Err(AppError::InvalidFileName)?;
         }
 
-        let res = handle_upload(&ctx.cfg.general.storage_dir, &ctx.db, field, file_name, query.encrypt, query.expiry_hours, query.expiry_downloads, query.embedded).await?;
+        let res = handle_upload(&ctx.cfg.general.storage_dir, &ctx.cfg.blacklist, &ctx.db, field, file_name, query.encrypt, query.expiry_hours, query.expiry_downloads, query.embedded).await?;
         return Ok(Json(res));
     }
 
