@@ -10,7 +10,7 @@ use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tokio::{
-    fs::File,
+    fs::{self, File},
     io::{self, AsyncRead, AsyncWrite, AsyncWriteExt},
 };
 use tokio_util::io::StreamReader;
@@ -114,14 +114,17 @@ async fn handle_upload(
     };
 
     // blacklist check
-    match sha256::try_async_digest(file_path).await {
+    match sha256::try_async_digest(&file_path).await {
         Ok(hash) => {
             let lc_blacklist = blacklist.iter().map(|bl| bl.to_lowercase()).collect::<Vec<_>>(); // TODO(hito): save it somewhere so it doesnt have to be computed every upload
             if lc_blacklist.contains(&hash.to_lowercase()) {
+                if let Err(why) = fs::remove_file(&file_path).await {
+                    tracing::error!("Failed to remove blacklisted file!! File name: {id}, error: {why:?}");
+                }
                 return Err(AppError::FileBlacklisted);
             }
         }
-        Err(why) => tracing::error!("Failed to check file hash!! File name: {id}, Error: {why:?}")
+        Err(why) => tracing::error!("Failed to check file hash!! File name: {id}, error: {why:?}")
     }
 
     if let Err(why) = update_stats(db, total_bytes as u64).await {
